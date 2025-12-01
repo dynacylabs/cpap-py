@@ -73,10 +73,10 @@ cpap-py/
 │   └── utils/
 │       ├── constants.py    # Channel IDs, event types
 │       └── validation.py   # Data validation utilities
-├── examples/
-│   ├── basic_usage.py      # Basic examples
-│   └── mcp_integration.py  # MCP server integration
-└── data/                   # Sample data directory
+├── tests/                  # Comprehensive test suite
+│   └── README.md           # Test documentation
+├── docs/                   # Additional documentation
+└── data/                   # Sample CPAP data
 ```
 
 ## File Types
@@ -270,7 +270,7 @@ import json
 json_output = json.dumps(data, default=str)
 ```
 
-See `examples/mcp_integration.py` for complete MCP server example.
+See USAGE.md for more detailed examples and integration patterns.
 
 ## Performance Considerations
 

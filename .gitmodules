@@ -7,3 +7,6 @@
 [submodule "submodules/OSCAR-code"]
 	path = submodules/OSCAR-code
 	url = https://gitlab.com/CrimsonNape/OSCAR-code.git
+[submodule "submodules/py-template"]
+	path = submodules/py-template
+	url = https://github.com/dynacylabs/py-template.git

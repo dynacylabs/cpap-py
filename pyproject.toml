@@ -38,15 +38,24 @@ dependencies = [
 dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
+    "pytest-mock>=3.10.0",
+    "coverage>=7.0.0",
     "black>=23.0.0",
     "ruff>=0.1.0",
     "mypy>=1.0.0",
 ]
+test = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest-mock>=3.10.0",
+    "coverage>=7.0.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/dynacylabs/cpap-py"
+Documentation = "https://github.com/dynacylabs/cpap-py/blob/main/README.md"
 Repository = "https://github.com/dynacylabs/cpap-py"
-Documentation = "https://github.com/dynacylabs/cpap-py"
+Issues = "https://github.com/dynacylabs/cpap-py/issues"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
@@ -67,3 +76,20 @@ python_version = "3.9"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v --cov=cpap_py --cov-report=term-missing --strict-markers --tb=short"
+markers = [
+    "unit: Unit tests with mocked dependencies",
+    "integration: Integration tests that use real CPAP data files",
+    "slow: Tests that are slow to run",
+]
+
+[tool.coverage.run]
+source = ["cpap_py"]
+omit = [
+    "*/tests/*",
+    "*/__pycache__/*",
+]

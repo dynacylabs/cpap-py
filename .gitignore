@@ -69,8 +69,25 @@ dmypy.json
 # Type checking
 .pytype/
 
+# Pyre type checker
+.pyre/
+
+# Rope project settings
+.ropeproject
+
+# Sphinx documentation
+docs/_build/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
 # OS
 .DS_Store
 Thumbs.db
 
-data
+# Project specific
+tmp.txt
+*.tmp
+
+# Note: Keep sample data in repo, but exclude any real patient data
+# data/
