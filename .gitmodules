@@ -1,0 +1,9 @@
+[submodule "submodules/Sleeper"]
+	path = submodules/Sleeper
+	url = https://github.com/CascadePass/Sleeper.git
+[submodule "submodules/cpap-lib"]
+	path = submodules/cpap-lib
+	url = https://github.com/EEGKit/cpap-lib.git
+[submodule "submodules/OSCAR-code"]
+	path = submodules/OSCAR-code
+	url = https://gitlab.com/CrimsonNape/OSCAR-code.git
