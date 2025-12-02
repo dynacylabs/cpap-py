@@ -351,3 +351,107 @@ def test_reader_full_workflow(sample_data_dir):
     data = reader.export_to_dict()
     assert "devices" in data
     assert "sessions" in data
+
+
+@pytest.mark.unit
+class TestCPAPReaderEdgeCases:
+    """Test edge cases and exception handling in CPAPReader."""
+    
+    def test_reader_no_settings_directory(self, tmp_path):
+        """Cover lines 157-158 - missing SETTINGS directory."""
+        (tmp_path / "DATALOG").mkdir()
+        # No SETTINGS directory
+        
+        reader = CPAPReader(str(tmp_path), crc_validation=CRCValidationMode.DISABLED)
+        errors = reader.get_validation_errors()
+        
+        settings_errors = [e for e in errors if 'SETTINGS' in e.message]
+        assert len(settings_errors) > 0
+    
+    def test_reader_str_parse_failure(self, tmp_path, mocker):
+        """Cover lines 229-232 - STR parse exception handling."""
+        (tmp_path / "DATALOG").mkdir()
+        (tmp_path / "SETTINGS").mkdir()
+        
+        str_file = tmp_path / "STR.edf"
+        str_file.write_bytes(b"corrupt")
+        
+        mocker.patch('cpap_py.reader.parse_str_file', side_effect=Exception("Parse error"))
+        
+        reader = CPAPReader(str(tmp_path), crc_validation=CRCValidationMode.DISABLED)
+        reader._load_sessions()
+        
+        errors = reader.get_validation_errors()
+        assert any('STR' in e.message and 'non-critical' in e.message for e in errors)
+    
+    def test_reader_identification_parse_failure(self, tmp_path, mocker):
+        """Cover lines 269-270 - identification file parse failure."""
+        (tmp_path / "DATALOG").mkdir()
+        (tmp_path / "SETTINGS").mkdir()
+        
+        id_file = tmp_path / "Identification.tgt"
+        id_file.write_bytes(b"bad data")
+        
+        mocker.patch('cpap_py.reader.parse_identification_file', side_effect=Exception("Parse error"))
+        
+        reader = CPAPReader(str(tmp_path), crc_validation=CRCValidationMode.DISABLED)
+        devices = reader.get_devices()
+        
+        errors = reader.get_validation_errors()
+        assert any(e.error_type == "parse_warning" for e in errors)
+        assert len(devices) > 0  # Should still create generic device
+    
+    def test_match_str_session_within_range(self, tmp_path):
+        """Cover lines 324-325 - matching session within range."""
+        (tmp_path / "DATALOG").mkdir()
+        
+        reader = CPAPReader(str(tmp_path), crc_validation=CRCValidationMode.DISABLED)
+        
+        datalog_time = datetime(2024, 1, 1, 22, 5)
+        str_sessions = [
+            (datetime(2024, 1, 1, 22, 0), datetime(2024, 1, 2, 6, 0)),
+        ]
+        
+        matched = reader._match_str_session(datalog_time, str_sessions)
+        assert matched == str_sessions[0]
+    
+    def test_match_str_session_close_distance(self, tmp_path):
+        """Cover lines 379-380 - matching by closest distance."""
+        (tmp_path / "DATALOG").mkdir()
+        
+        reader = CPAPReader(str(tmp_path), crc_validation=CRCValidationMode.DISABLED)
+        
+        datalog_time = datetime(2024, 1, 1, 21, 45)  # 15 min before session
+        str_sessions = [
+            (datetime(2024, 1, 1, 22, 0), datetime(2024, 1, 2, 6, 0)),
+        ]
+        
+        matched = reader._match_str_session(datalog_time, str_sessions)
+        assert matched == str_sessions[0]
+    
+    def test_find_str_session_index_not_found(self, tmp_path):
+        """Cover lines 402-404, 440-445 - session index not found."""
+        (tmp_path / "DATALOG").mkdir()
+        
+        reader = CPAPReader(str(tmp_path), crc_validation=CRCValidationMode.DISABLED)
+        
+        session = (datetime(2024, 1, 1, 22, 0), datetime(2024, 1, 2, 6, 0))
+        all_sessions = [
+            (datetime(2024, 1, 2, 22, 0), datetime(2024, 1, 3, 6, 0)),
+        ]
+        
+        idx = reader._find_str_session_index(session, all_sessions)
+        assert idx == 0  # Returns default
+    
+    def test_export_to_dict(self, tmp_path):
+        """Cover lines 507-519 - export to dict."""
+        (tmp_path / "DATALOG").mkdir()
+        (tmp_path / "SETTINGS").mkdir()
+        
+        reader = CPAPReader(str(tmp_path), crc_validation=CRCValidationMode.DISABLED)
+        export = reader.export_to_dict()
+        
+        assert "devices" in export
+        assert "sessions" in export
+        assert "validation_errors" in export
+

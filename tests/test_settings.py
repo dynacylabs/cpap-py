@@ -471,3 +471,78 @@ def test_settings_proposal_empty_changes():
     )
     
     assert len(proposal.proposed_changes) == 0
+
+
+@pytest.mark.unit
+class TestSettingsValidationEdgeCases:
+    """Test edge cases in settings validation and formatting."""
+    
+    def test_validate_safety_requires_clinical_approval(self):
+        """Cover line 154 - requires_clinical_approval flag."""
+        from cpap_py.settings import ChangeReason
+        change = SettingChange(
+            setting_name="pressure_min",
+            current_value=4.0,
+            proposed_value=8.0,
+            reason=ChangeReason.REDUCE_AHI,
+            rationale="Increase minimum pressure"
+        )
+        change.requires_clinical_approval = True
+        
+        proposal = SettingsProposal(
+            device_serial="TEST123",
+            current_settings=DeviceSettings(),
+            proposed_changes=[change],
+            overall_rationale="Test",
+            expected_outcomes=["Better therapy"]
+        )
+        
+        result = proposal.validate_all_changes()
+        assert proposal.requires_clinical_review is True
+    
+    def test_format_proposal_with_warnings(self):
+        """Cover line 229 - safety warnings in formatted proposal."""
+        from cpap_py.settings import ChangeReason
+        change = SettingChange(
+            setting_name="pressure_max",
+            current_value=10.0,
+            proposed_value=20.0,
+            reason=ChangeReason.REDUCE_AHI,
+            rationale="Increase max pressure"
+        )
+        change.safety_warnings = ["High pressure warning"]
+        
+        proposal = SettingsProposal(
+            device_serial="TEST123",
+            current_settings=DeviceSettings(),
+            proposed_changes=[change],
+            overall_rationale="Test",
+            expected_outcomes=["Better AHI"]
+        )
+        
+        formatted = proposal.to_summary()
+        assert "⚠️  Warnings:" in formatted
+    
+    def test_format_proposal_requires_clinical_review(self):
+        """Cover line 243 - clinical review warning."""
+        from cpap_py.settings import ChangeReason
+        change = SettingChange(
+            setting_name="pressure_min",
+            current_value=4.0,
+            proposed_value=12.0,
+            reason=ChangeReason.REDUCE_AHI,
+            rationale="Significant increase"
+        )
+        
+        proposal = SettingsProposal(
+            device_serial="TEST123",
+            current_settings=DeviceSettings(),
+            proposed_changes=[change],
+            overall_rationale="Major adjustment",
+            expected_outcomes=["Improved therapy"],
+            requires_clinical_review=True
+        )
+        
+        formatted = proposal.to_summary()
+        assert "⚠️  This proposal requires clinical review" in formatted
+

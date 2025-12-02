@@ -3,6 +3,7 @@ Tests for TGT (settings) file parser.
 """
 
 import pytest
+import struct
 from pathlib import Path
 
 from cpap_py.parsers.tgt_parser import (
@@ -318,3 +319,83 @@ def test_parse_tgt_with_invalid_lines(tmp_path):
     # Keys may include colon in the dict
     assert any("ValidKey" in k for k in data.keys())
     assert any("AnotherKey" in k for k in data.keys())
+
+
+@pytest.mark.unit
+class TestTGTParserEdgeCases:
+    """Test edge cases and exception handling in TGT parser."""
+    
+    def test_parse_settings_invalid_mode(self, tmp_path):
+        """Cover lines 87-88 - invalid mode value error."""
+        from cpap_py.parsers.tgt_parser import parse_tgt_file, tgt_to_device_settings
+        
+        tgt_file = tmp_path / "test.tgt"
+        tgt_data = {b'mode': struct.pack('<I', 999)}
+        
+        content = b''
+        for key, value in tgt_data.items():
+            content += struct.pack('<I', len(key)) + key
+            content += struct.pack('<I', len(value)) + value
+        
+        tgt_file.write_bytes(content)
+        
+        parsed = parse_tgt_file(str(tgt_file))
+        settings = tgt_to_device_settings(parsed)
+        assert settings is not None
+    
+    def test_parse_settings_invalid_mask_type(self, tmp_path):
+        """Cover lines 129-130 - invalid mask type value error."""
+        from cpap_py.parsers.tgt_parser import parse_tgt_file, tgt_to_device_settings
+        
+        tgt_file = tmp_path / "test.tgt"
+        tgt_data = {b'mask_type': struct.pack('<I', 999)}
+        
+        content = b''
+        for key, value in tgt_data.items():
+            content += struct.pack('<I', len(key)) + key
+            content += struct.pack('<I', len(value)) + value
+        
+        tgt_file.write_bytes(content)
+        
+        parsed = parse_tgt_file(str(tgt_file))
+        settings = tgt_to_device_settings(parsed)
+        assert settings is not None
+    
+    def test_parse_settings_climate_control(self, tmp_path):
+        """Cover line 161 - climate_control field."""
+        from cpap_py.parsers.tgt_parser import parse_tgt_file, tgt_to_device_settings
+        
+        tgt_file = tmp_path / "test.tgt"
+        tgt_data = {b'climate_control': struct.pack('<I', 1)}
+        
+        content = b''
+        for key, value in tgt_data.items():
+            content += struct.pack('<I', len(key)) + key
+            content += struct.pack('<I', len(value)) + value
+        
+        tgt_file.write_bytes(content)
+        
+        parsed = parse_tgt_file(str(tgt_file))
+        settings = tgt_to_device_settings(parsed)
+        assert settings is not None
+    
+    def test_parse_settings_autoset_response(self, tmp_path):
+        """Cover line 165 - autoset_response field."""
+        from cpap_py.parsers.tgt_parser import parse_tgt_file, tgt_to_device_settings
+        
+        tgt_file = tmp_path / "test.tgt"
+        tgt_data = {b'autoset_response': struct.pack('<I', 2)}
+        
+        content = b''
+        for key, value in tgt_data.items():
+            content += struct.pack('<I', len(key)) + key
+            content += struct.pack('<I', len(value)) + value
+        
+        tgt_file.write_bytes(content)
+        
+        parsed = parse_tgt_file(str(tgt_file))
+        settings = tgt_to_device_settings(parsed)
+        assert settings is not None
+
+        assert settings is not None
+

@@ -506,3 +506,259 @@ class TestEnums:
         ]
         for event in events:
             assert isinstance(event.value, str)
+
+
+@pytest.mark.unit
+class TestSessionDataRetrievalEdgeCases:
+    """Test edge cases for session data retrieval methods."""
+    
+    def test_get_pressure_data_returns_none_when_no_matching_channels(self, tmp_path, mocker):
+        """Test get_pressure_data returns None when no pressure channels found."""
+        brp_file = tmp_path / "test.BRP"
+        brp_file.write_bytes(b"dummy")
+        
+        summary = SessionSummary(
+            duration_seconds=3600,
+            duration_hours=1.0,
+            mask_on_time=datetime(2024, 1, 1, 22, 0),
+            mask_off_time=datetime(2024, 1, 1, 23, 0)
+        )
+        
+        settings = DeviceSettings()
+        
+        session = Session(
+            session_id="test1",
+            device_serial="TEST123",
+            date=date(2024, 1, 1),
+            start_time=datetime(2024, 1, 1, 22, 0),
+            summary=summary,
+            settings=settings,
+            has_pressure_data=True,
+            _brp_file=str(brp_file)
+        )
+        
+        # Mock parse_pressure_file to return waveforms with no pressure channels
+        mock_waveform = WaveformData(
+            channel_name="OtherChannel",
+            values=np.array([1.0, 2.0, 3.0]),
+            sample_rate=1.0,
+            start_time=datetime(2024, 1, 1, 22, 0),
+            unit="unknown"
+        )
+        mocker.patch('cpap_py.parsers.edf_parser.parse_pressure_file', return_value=[mock_waveform])
+        
+        result = session.get_pressure_data()
+        assert result is None
+    
+    def test_get_flow_data_returns_none_when_no_matching_channels(self, tmp_path, mocker):
+        """Test get_flow_data returns None when no flow channels found."""
+        brp_file = tmp_path / "test.BRP"
+        brp_file.write_bytes(b"dummy")
+        
+        summary = SessionSummary(
+            duration_seconds=3600,
+            duration_hours=1.0,
+            mask_on_time=datetime(2024, 1, 1, 22, 0),
+            mask_off_time=datetime(2024, 1, 1, 23, 0)
+        )
+        
+        settings = DeviceSettings()
+        
+        session = Session(
+            session_id="test2",
+            device_serial="TEST123",
+            date=date(2024, 1, 1),
+            start_time=datetime(2024, 1, 1, 22, 0),
+            summary=summary,
+            settings=settings,
+            has_flow_data=True,
+            _brp_file=str(brp_file)
+        )
+        
+        # Mock parse_pressure_file to return waveforms with no flow channels
+        mock_waveform = WaveformData(
+            channel_name="PressureChannel",
+            values=np.array([10.0, 11.0, 12.0]),
+            sample_rate=1.0,
+            start_time=datetime(2024, 1, 1, 22, 0),
+            unit="cmH2O"
+        )
+        mocker.patch('cpap_py.parsers.edf_parser.parse_pressure_file', return_value=[mock_waveform])
+        
+        result = session.get_flow_data()
+        assert result is None
+    
+    def test_get_spo2_data_returns_none_when_empty_list(self, tmp_path, mocker):
+        """Test get_spo2_data returns None when parser returns empty list."""
+        sad_file = tmp_path / "test.SAD"
+        sad_file.write_bytes(b"dummy")
+        
+        summary = SessionSummary(
+            duration_seconds=3600,
+            duration_hours=1.0,
+            mask_on_time=datetime(2024, 1, 1, 22, 0),
+            mask_off_time=datetime(2024, 1, 1, 23, 0)
+        )
+        
+        settings = DeviceSettings()
+        
+        session = Session(
+            session_id="test3",
+            device_serial="TEST123",
+            date=date(2024, 1, 1),
+            start_time=datetime(2024, 1, 1, 22, 0),
+            summary=summary,
+            settings=settings,
+            has_spo2_data=True,
+            _sad_file=str(sad_file)
+        )
+        
+        # Mock parse_spo2_file to return empty list
+        mocker.patch('cpap_py.parsers.edf_parser.parse_spo2_file', return_value=[])
+        
+        result = session.get_spo2_data()
+        assert result is None
+
+
+@pytest.mark.unit
+class TestSessionDataRetrieval:
+    """Test Session data retrieval methods with lazy loading."""
+    
+    def test_get_events_lazy_load_with_file(self, tmp_path, mocker):
+        """Test lazy loading events from EVE file."""
+        eve_file = tmp_path / "test_EVE.edf"
+        eve_file.write_bytes(b"mock data")
+        
+        # Mock parse_eve_file
+        mock_event = Event(
+            type=EventType.OBSTRUCTIVE_APNEA,
+            timestamp=datetime(2024, 1, 1, 22, 30),
+            duration=10.0
+        )
+        mocker.patch('cpap_py.parsers.edf_parser.parse_eve_file', return_value=[mock_event])
+        
+        summary = SessionSummary(duration_seconds=28800, duration_hours=8.0, ahi=5.0)
+        settings = DeviceSettings(mode=CPAPMode.CPAP)
+        session = Session(
+            session_id='TEST_001',
+            device_serial='TEST123',
+            date=date(2024, 1, 1),
+            start_time=datetime(2024, 1, 1, 22, 0),
+            summary=summary,
+            settings=settings,
+            has_events=True
+        )
+        session._eve_file = str(eve_file)
+        
+        events = session.get_events()
+        assert len(events) == 1
+        
+        filtered = session.get_events(event_type=EventType.OBSTRUCTIVE_APNEA)
+        assert len(filtered) == 1
+    
+    def test_get_events_no_file_set(self):
+        """Test get_events when no EVE file is set."""
+        summary = SessionSummary(duration_seconds=28800, duration_hours=8.0, ahi=5.0)
+        settings = DeviceSettings(mode=CPAPMode.CPAP)
+        session = Session(
+            session_id='TEST_001',
+            device_serial='TEST123',
+            date=date(2024, 1, 1),
+            start_time=datetime(2024, 1, 1, 22, 0),
+            summary=summary,
+            settings=settings,
+            has_events=True
+        )
+        
+        events = session.get_events()
+        assert events == []
+    
+    def test_get_pressure_data_with_file(self, tmp_path, mocker):
+        """Test get_pressure_data with BRP file."""
+        brp_file = tmp_path / "test_BRP.edf"
+        brp_file.write_bytes(b"mock data")
+        
+        mock_waveform = WaveformData(
+            channel_name="Mask Pressure",
+            unit="cmH2O",
+            sample_rate=25.0,
+            start_time=datetime(2024, 1, 1, 22, 0),
+            values=np.array([10.0, 10.5, 11.0])
+        )
+        mocker.patch('cpap_py.parsers.edf_parser.parse_pressure_file', return_value=[mock_waveform])
+        
+        summary = SessionSummary(duration_seconds=28800, duration_hours=8.0, ahi=5.0)
+        settings = DeviceSettings(mode=CPAPMode.CPAP)
+        session = Session(
+            session_id='TEST_001',
+            device_serial='TEST123',
+            date=date(2024, 1, 1),
+            start_time=datetime(2024, 1, 1, 22, 0),
+            summary=summary,
+            settings=settings,
+            has_pressure_data=True
+        )
+        session._brp_file = str(brp_file)
+        
+        df = session.get_pressure_data()
+        assert df is not None
+    
+    def test_get_flow_data_with_file(self, tmp_path, mocker):
+        """Test get_flow_data with BRP file."""
+        brp_file = tmp_path / "test_BRP.edf"
+        brp_file.write_bytes(b"mock data")
+        
+        mock_waveform = WaveformData(
+            channel_name="Flow Rate",
+            unit="L/min",
+            sample_rate=25.0,
+            start_time=datetime(2024, 1, 1, 22, 0),
+            values=np.array([20.0, 21.0, 22.0])
+        )
+        mocker.patch('cpap_py.parsers.edf_parser.parse_pressure_file', return_value=[mock_waveform])
+        
+        summary = SessionSummary(duration_seconds=28800, duration_hours=8.0, ahi=5.0)
+        settings = DeviceSettings(mode=CPAPMode.CPAP)
+        session = Session(
+            session_id='TEST_001',
+            device_serial='TEST123',
+            date=date(2024, 1, 1),
+            start_time=datetime(2024, 1, 1, 22, 0),
+            summary=summary,
+            settings=settings,
+            has_flow_data=True
+        )
+        session._brp_file = str(brp_file)
+        
+        df = session.get_flow_data()
+        assert df is not None
+    
+    def test_get_spo2_data_with_file(self, tmp_path, mocker):
+        """Test get_spo2_data with SAD file."""
+        sad_file = tmp_path / "test_SAD.edf"
+        sad_file.write_bytes(b"mock data")
+        
+        mock_waveform = WaveformData(
+            channel_name="SpO2",
+            unit="%",
+            sample_rate=1.0,
+            start_time=datetime(2024, 1, 1, 22, 0),
+            values=np.array([95.0, 96.0, 97.0])
+        )
+        mocker.patch('cpap_py.parsers.edf_parser.parse_spo2_file', return_value=[mock_waveform])
+        
+        summary = SessionSummary(duration_seconds=28800, duration_hours=8.0, ahi=5.0)
+        settings = DeviceSettings(mode=CPAPMode.CPAP)
+        session = Session(
+            session_id='TEST_001',
+            device_serial='TEST123',
+            date=date(2024, 1, 1),
+            start_time=datetime(2024, 1, 1, 22, 0),
+            summary=summary,
+            settings=settings,
+            has_spo2_data=True
+        )
+        session._sad_file = str(sad_file)
+        
+        df = session.get_spo2_data()
+        assert df is not None

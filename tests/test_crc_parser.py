@@ -358,3 +358,32 @@ def test_validate_real_cpap_files(sample_datalog_dir):
     for file_path, result in results.items():
         assert "valid" in result
         assert "error" in result or "crc_file" in result
+
+
+@pytest.mark.unit
+class TestCRCParserEdgeCases:
+    """Test edge cases and exception handling in CRC parser."""
+    
+    def test_parse_crc_big_endian_16bit(self, tmp_path):
+        """Cover lines 52, 54 - big-endian 16-bit CRC."""
+        from cpap_py.parsers.crc_parser import read_crc_file
+        
+        crc_file = tmp_path / "test.crc"
+        crc_file.write_bytes(struct.pack('>H', 0x1234))
+        
+        result = read_crc_file(str(crc_file))
+        # Function tries little-endian first, then falls back to big-endian
+        assert result is not None
+    
+    def test_validate_crc_strict_mode_read_failure(self, tmp_path):
+        """Cover line 140 - strict mode raises on read failure."""
+        from cpap_py.parsers.crc_parser import validate_file_crc
+        
+        crc_file = tmp_path / "test.crc"
+        crc_file.write_bytes(struct.pack('<I', 0x12345678))
+        
+        target_file = tmp_path / "nonexistent.tgt"
+        
+        with pytest.raises(CRCError, match="Failed to read data file"):
+            validate_file_crc(str(target_file), str(crc_file), mode=CRCValidationMode.STRICT)
+

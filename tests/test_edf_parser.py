@@ -417,4 +417,21 @@ def test_parse_str_file_fallback(tmp_path, mocker):
     
     assert session_times == []
     assert summary_stats == {}
-    assert summary_stats == {}
+
+
+@pytest.mark.unit
+class TestEDFParserExceptionHandling:
+    """Test exception handling in EDF parser operations."""
+    
+    def test_read_annotations_exception_returns_empty(self, tmp_path, mocker):
+        """Cover lines 111-112 - exception returns empty list."""
+        from cpap_py.parsers.edf_parser import EDFParser
+        
+        eve_file = tmp_path / "test.EVE"
+        eve_file.write_bytes(b"dummy")
+        
+        parser = EDFParser(str(eve_file))
+        mocker.patch.object(parser, '_open_file', side_effect=Exception("Error"))
+        
+        result = parser.read_annotations()
+        assert result == []
