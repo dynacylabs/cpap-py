@@ -248,6 +248,8 @@ class CPAPReader:
                     continue
                 
                 # Group files by timestamp
+                # Note: ResMed often writes EVE/CSL files with slightly different timestamps
+                # than waveform files (BRP/PLD/SAD), so we need to merge nearby sessions
                 session_files = defaultdict(dict)
                 
                 for file_path in date_dir.glob("*.edf"):
@@ -261,8 +263,11 @@ class CPAPReader:
                         
                         session_files[timestamp][file_type] = file_path
                 
+                # Merge sessions that are within 60 seconds of each other
+                merged_sessions = self._merge_nearby_sessions(session_files)
+                
                 # Create session objects
-                for timestamp, files in session_files.items():
+                for timestamp, files in merged_sessions.items():
                     # Parse timestamp
                     try:
                         start_time = datetime.strptime(timestamp, "%Y%m%d_%H%M%S")
@@ -283,6 +288,64 @@ class CPAPReader:
                         sessions.append(session)
         
         self._sessions = sessions
+    
+    def _merge_nearby_sessions(
+        self,
+        session_files: Dict[str, Dict[str, Path]]
+    ) -> Dict[str, Dict[str, Path]]:
+        """
+        Merge session files that have timestamps within 60 seconds of each other.
+        
+        ResMed often writes EVE/CSL files with slightly different timestamps than
+        waveform files (BRP/PLD/SAD). This merges them into a single session.
+        
+        Args:
+            session_files: Dict mapping timestamp to file types
+        
+        Returns:
+            Merged dict with combined file types under representative timestamps
+        """
+        if len(session_files) <= 1:
+            return session_files
+        
+        # Parse timestamps and sort
+        timestamp_map = []
+        for timestamp_str in session_files.keys():
+            try:
+                dt = datetime.strptime(timestamp_str, "%Y%m%d_%H%M%S")
+                timestamp_map.append((timestamp_str, dt))
+            except ValueError:
+                # Keep unparseable timestamps separate
+                pass
+        
+        timestamp_map.sort(key=lambda x: x[1])
+        
+        # Group nearby timestamps
+        merged = {}
+        i = 0
+        while i < len(timestamp_map):
+            base_ts_str, base_dt = timestamp_map[i]
+            merged_files = dict(session_files[base_ts_str])
+            
+            # Look ahead for timestamps within 60 seconds
+            j = i + 1
+            while j < len(timestamp_map):
+                next_ts_str, next_dt = timestamp_map[j]
+                time_diff = abs((next_dt - base_dt).total_seconds())
+                
+                if time_diff <= 60:
+                    # Merge this timestamp's files
+                    for file_type, file_path in session_files[next_ts_str].items():
+                        if file_type not in merged_files:
+                            merged_files[file_type] = file_path
+                    j += 1
+                else:
+                    break
+            
+            merged[base_ts_str] = merged_files
+            i = j if j > i + 1 else i + 1
+        
+        return merged
     
     def _create_session(
         self,
@@ -312,17 +375,22 @@ class CPAPReader:
             str_summary_stats
         )
         
-        # Load settings (try to find appropriate settings file)
+        # Load settings (merge from all TGT files)
         settings = DeviceSettings()
         if self._settings_path.exists():
-            # Find a settings file - this is simplified
             tgt_files = list(self._settings_path.glob("*.tgt"))
-            if tgt_files:
+            
+            # Merge settings from all TGT files
+            merged_tgt_data = {}
+            for tgt_file in tgt_files:
                 try:
-                    tgt_data = parse_tgt_file(str(tgt_files[0]))
-                    settings = tgt_to_device_settings(tgt_data)
+                    tgt_data = parse_tgt_file(str(tgt_file))
+                    merged_tgt_data.update(tgt_data)
                 except Exception:
                     pass
+            
+            if merged_tgt_data:
+                settings = tgt_to_device_settings(merged_tgt_data)
         
         session_id = f"{device_serial}_{start_time.strftime('%Y%m%d_%H%M%S')}"
         
@@ -337,12 +405,14 @@ class CPAPReader:
             has_flow_data=has_brp,
             has_spo2_data=has_sad,
             has_events=has_eve,
-            _brp_file=str(files.get("BRP")) if "BRP" in files else None,
-            _pld_file=str(files.get("PLD")) if "PLD" in files else None,
-            _sad_file=str(files.get("SAD") or files.get("SA2")) if has_sad else None,
-            _eve_file=str(files.get("EVE")) if "EVE" in files else None,
-            _csl_file=str(files.get("CSL")) if "CSL" in files else None,
         )
+        
+        # Set file paths as attributes (can't pass to __init__ with _ prefix in Pydantic v2)
+        session._brp_file = str(files.get("BRP")) if "BRP" in files else None
+        session._pld_file = str(files.get("PLD")) if "PLD" in files else None
+        session._sad_file = str(files.get("SAD") or files.get("SA2")) if has_sad else None
+        session._eve_file = str(files.get("EVE")) if "EVE" in files else None
+        session._csl_file = str(files.get("CSL")) if "CSL" in files else None
         
         return session
     

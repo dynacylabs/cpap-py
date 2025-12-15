@@ -283,8 +283,20 @@ def parse_eve_file(file_path: str, start_time: datetime) -> List[Event]:
     Returns:
         List of Event objects
     """
-    parser = EDFParser(file_path)
-    annotations = parser.read_annotations()
+    annotations = []
+    
+    # Try standard parser first
+    try:
+        parser = EDFParser(file_path)
+        annotations = parser.read_annotations()
+    except (OSError, Exception) as e:
+        # If pyedflib fails (discontinuous file), annotations will be empty
+        pass
+    
+    # If no annotations found, try custom parser (handles discontinuous files)
+    if not annotations:
+        from cpap_py.parsers.eve_parser import parse_resmed_eve_file
+        annotations = parse_resmed_eve_file(file_path)
     
     events = []
     for onset, duration, text in annotations:

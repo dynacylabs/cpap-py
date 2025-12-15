@@ -135,18 +135,25 @@ EVENT_TYPE_MAP = {
 
 # Settings file (TGT) key mappings
 SETTINGS_KEYS = {
-    # Device identification
+    # Device identification  
     "#IMF": "software_version",
     "#VIR": "internal_version",
     "#RIR": "release_version",
     "#PVR": "platform_version",
     "#PVD": "platform_variant",
+    "#STP": "ramp_start_pressure",  # Start pressure - in 0.1 cmH2O (200 = 20.0)
+    "#SRN": "serial_number_tgt",  # Serial from TGT (not used - comes from STR.edf)
+    "#IPC": "product_name",  # Product name (confirmed from data)
+    "#PNA": "epr_extended",  # EPR extended (alternate key)
     
     # Therapy mode
     "Mode": "mode",
     "S.Mode": "mode",
     
-    # Pressure settings
+    # Pressure settings (ResMed hex codes - values in 0.1 cmH2O)
+    "#MPA": "pressure_max_raw",  # Max pressure (in 0.1 cmH2O units - needs /10)
+    "#MPI": "pressure_min_raw",  # Min pressure (in 0.1 cmH2O units - needs /10)
+    "#STP": "ramp_start_pressure_raw",  # Start pressure (in 0.1 cmH2O units - needs /10)
     "Press": "pressure",
     "S.C.Press": "pressure",
     "S.C.StartPress": "start_pressure",
@@ -155,18 +162,30 @@ SETTINGS_KEYS = {
     "MaxPress": "pressure_max",
     "MinPress": "pressure_min",
     
-    # EPR settings
+    # EPR settings (ResMed hex codes)
+    "#EPR": "epr_level_raw",  # Raw EPR value (needs decoding)
+    "#EPA": "epr_enable",  # EPR enable
+    "#EPT": "epr_type_raw",  # EPR type (1=ramp only, etc)
+    "#EPX": "epr_extended",  # Extended EPR
     "S.EPR.ClinEnable": "epr_clinical_enable",
     "S.EPR.EPREnable": "epr_enable",
     "S.EPR.Level": "epr_level",
     "S.EPR.EPRType": "epr_type",
     
-    # Ramp settings
+    # Ramp settings (ResMed hex codes)
+    "#RMT": "ramp_time",  # Ramp time in minutes
     "S.RampEnable": "ramp_enable",
     "S.RampTime": "ramp_time",
     "RampTime": "ramp_time",
     
-    # Mask and comfort
+    # Mask and comfort (ResMed hex codes)
+    "#MSK": "mask_type_raw",  # Mask type (0=Full Face, 1=Nasal, 2=Pillows)
+    "#TBT": "tube_type_raw",  # Tube type (0=SlimLine, 1=Standard)
+    "#ABF": "antibacterial_filter",  # Antibacterial filter
+    "#SST": "smart_start",  # Smart Start enable
+    "#MOP": "mode_raw",  # Mode (0=CPAP, 1=AutoSet)
+    "#RSC": "response_raw",  # Response mode (0=Standard, 1=Soft, 2=For Her)
+    "#AXS": "patient_access_raw",  # Patient access enable
     "S.Mask": "mask_type",
     "Mask": "mask_type",
     "S.SmartStart": "smart_start",
@@ -175,7 +194,12 @@ SETTINGS_KEYS = {
     "TubeType": "tube_type",
     "S.ABFilter": "antibacterial_filter",
     
-    # Humidifier
+    # Humidifier (ResMed hex codes)
+    "#HME": "humidifier_enabled",  # Humidifier enable
+    "#HMS": "humidifier_level",  # Humidifier level (1-8)
+    "#CCO": "climate_control",  # Climate control enable
+    "#TMU": "temperature_enabled",  # Temperature enable
+    "#HTF": "temperature_raw",  # Temperature (in tenths)
     "S.HumEnable": "humidifier_enable",
     "S.HumLevel": "humidifier_level",
     "HumLevel": "humidifier_level",
@@ -183,6 +207,11 @@ SETTINGS_KEYS = {
     "S.Temp": "temperature",
     "S.ClimateControl": "climate_control",
     "ClimateControl": "climate_control",
+    
+    # IPAP/EPAP (for BiPAP modes - in 0.1 cmH2O units)
+    "#IPP": "ipap_raw",  # IPAP pressure
+    "#EPI": "epap_min_raw",  # EPAP min pressure
+    "#EPP": "epap_max_raw",  # EPAP max pressure
     
     # Access
     "S.PtAccess": "patient_access",
