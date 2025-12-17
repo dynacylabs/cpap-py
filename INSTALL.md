@@ -14,14 +14,9 @@ This guide covers how to install cpap-py.
 
 ## Requirements
 
-- **Python**: 3.9 or higher
+- **Python**: 3.8 or higher
 - **pip**: Latest version recommended
-- **Dependencies**: 
-  - `pyedflib >= 0.1.30`
-  - `numpy >= 1.20.0`
-  - `pandas >= 1.3.0`
-  - `pydantic >= 2.0.0`
-  - `python-dateutil >= 2.8.0`
+- **Dependencies**: None! cpap-py uses only the Python standard library
 
 ## Installation Methods
 
@@ -66,7 +61,7 @@ pip install git+https://github.com/dynacylabs/cpap-py.git
 
 ### Development Installation
 
-For development, install in editable mode with all dependencies:
+For development, install in editable mode with test dependencies:
 
 ```bash
 # Clone the repository
@@ -83,12 +78,12 @@ pip install -e ".[dev]"
 
 This allows you to make changes to the code and see them reflected immediately without reinstalling.
 
-### Optional Dependencies
+### Development Dependencies
 
-If you need development tools:
+If you need development and testing tools:
 
 ```bash
-pip install cpap-py[dev]
+pip install -e ".[dev]"
 ```
 
 This includes:
@@ -113,14 +108,16 @@ python -c "import cpap_py; print(cpap_py.__version__)"
 Create a file `test_install.py`:
 
 ```python
-from cpap_py import CPAPReader
+import cpap_py
 
 # Test basic functionality
 print("✓ cpap-py imported successfully!")
 print(f"Version: {cpap_py.__version__}")
 
-# You can now use the library with actual CPAP data
-# reader = CPAPReader("/path/to/sdcard")
+# Verify all modules are accessible
+from cpap_py import CPAPLoader, IdentificationParser, STRParser
+from cpap_py import DatalogParser, SettingsParser, EDFParser
+print("✓ All modules imported successfully!")
 ```
 
 Run it:
@@ -131,13 +128,10 @@ python test_install.py
 
 ### Run Tests
 
-If you installed from source:
+If you installed from source with dev dependencies:
 
 ```bash
 # Run the test suite
-./run_tests.sh unit
-
-# Or use pytest directly
 pytest tests/ -v
 ```
 
@@ -151,7 +145,7 @@ pytest tests/ -v
 ```bash
 pip install cpap-py
 # or for development:
-pip install -e ".[dev]"
+pip install -e .
 ```
 
 #### Permission Denied Error
@@ -175,35 +169,14 @@ pip install cpap-py
 pip install --upgrade --force-reinstall cpap-py
 ```
 
-#### Dependency Conflicts
+#### Python Version Too Old
 
-**Solution**: Use a fresh virtual environment:
+cpap-py requires Python 3.8 or higher. Check your version:
 ```bash
-python -m venv fresh_env
-source fresh_env/bin/activate
-pip install cpap-py
+python --version
 ```
 
-#### pyedflib Installation Issues
-
-If you encounter issues with pyedflib (requires compilation):
-
-**On Linux**:
-```bash
-sudo apt-get install python3-dev
-pip install cpap-py
-```
-
-**On macOS**:
-```bash
-# Ensure Xcode command line tools are installed
-xcode-select --install
-pip install cpap-py
-```
-
-**On Windows**:
-- Ensure you have Microsoft Visual C++ Build Tools installed
-- Download from: https://visualstudio.microsoft.com/visual-cpp-build-tools/
+If you have an older version, upgrade Python or use a newer environment.
 
 ### Getting Help
 

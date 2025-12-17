@@ -1,46 +1,38 @@
-# CPAP Data Parser Library
+# cpap-py
 
-A Python library for parsing ResMed CPAP (Continuous Positive Airway Pressure) device data files. This library supports parsing all information stored in CPAP data files including device identification, summary statistics, detailed waveform data, and configuration changes.
+A lightweight Python library for parsing ResMed CPAP (Continuous Positive Airway Pressure) device data files. This library provides complete access to all data stored on CPAP devices including device identification, summary statistics, detailed waveform data, and configuration changes.
 
 ## Features
 
+- **Zero Dependencies**: Pure Python implementation using only the standard library
 - **Complete Data Extraction**: Parses all available CPAP data including pressure settings, delivered pressures, leak rates, respiratory metrics, and event indices
 - **Device Identification**: Parse both `.tgt` (text) and `.json` format identification files
 - **Summary Data**: Extract daily statistics from `STR.edf` files including AHI, leak, pressure, respiratory rate
 - **Session Data**: Parse detailed waveform data from `DATALOG` EDF files
 - **Settings & Configuration**: Extract device settings including pressure ranges (min/max), comfort settings, humidification
-- **EDF/EDF+ Support**: Full parser for European Data Format files used by medical devices
+- **Pure Python EDF Parser**: Full parser for European Data Format files used by medical devices
 - **Multiple Device Support**: Works with ResMed S9, AirSense 10, AirSense 11, and AirCurve series
-- **JSON Export**: Complete data export to JSON for analysis
+- **Broad Compatibility**: Supports Python 3.8+
 
 ## Installation
 
 ```bash
-pip install -e .
+pip install cpap-py
 ```
+
+For development:
+
+```bash
+git clone https://github.com/dynacylabs/cpap-py.git
+cd cpap-py
+pip install -e .
 
 ## Quick Start
 
-### Generate Complete JSON Output
-
-```bash
-# Export all CPAP data to JSON
-python dump_cpap_data.py data/set_1/ > output.json
-```
-
-The output.json file contains:
-- Device identification and firmware info
-- Current device configuration (pressure ranges, comfort settings, humidification)
-- Daily summary records with AHI, leak stats, pressure stats, respiratory metrics
-- Detailed session data organized by date
-- Settings change history
-
-See [DATA_GUIDE.md](DATA_GUIDE.md) for complete details on the JSON output format.
-
-### Use the Library Programmatically
+### Use the Library
 
 ```python
-from cpap_parser import CPAPLoader
+from cpap_py import CPAPLoader
 
 # Load all data from a CPAP data directory
 loader = CPAPLoader("path/to/cpap/data")
@@ -70,7 +62,7 @@ for session in data.sessions:
 ### Load Only Identification
 
 ```python
-from cpap_parser import IdentificationParser
+from cpap_py import IdentificationParser
 
 parser = IdentificationParser("path/to/data")
 info = parser.parse()
@@ -80,7 +72,7 @@ print(f"{info.model} (S/N: {info.serial})")
 ### Load Summary Data
 
 ```python
-from cpap_parser import STRParser
+from cpap_py import STRParser
 
 parser = STRParser("path/to/STR.edf")
 if parser.parse():
@@ -92,7 +84,7 @@ if parser.parse():
 ### Load Session Data
 
 ```python
-from cpap_parser import DatalogParser
+from cpap_py import DatalogParser
 
 parser = DatalogParser("path/to/DATALOG")
 sessions = parser.parse_all_sessions()
@@ -106,7 +98,7 @@ for session in sessions:
 ### Parse Individual EDF Files
 
 ```python
-from cpap_parser import EDFParser
+from cpap_py import EDFParser
 
 edf = EDFParser("path/to/file.edf")
 if edf.parse():
@@ -219,64 +211,35 @@ EDF signal descriptor.
 
 **Fields:** `label`, `physical_dimension`, `sample_count`, `gain`, `offset`, `data`
 
-## Example Scripts
+## Project Structure
 
-See the [examples/](examples/) directory for useful scripts:
-
-- **show_one_day.py**: Display all data for a specific date
-- **list_str_signals.py**: List all available signals in STR.edf
-- **show_settings.py**: View device settings from .tgt files
+```
+cpap-py/
+├── src/
+│   └── cpap_py/          # Main library package
+│       ├── __init__.py
+│       ├── edf_parser.py     # EDF/EDF+ file parser
+│       ├── identification.py # Device ID parser
+│       ├── str_parser.py     # Summary data parser
+│       ├── datalog_parser.py # Session data parser
+│       ├── settings_parser.py# Settings parser
+│       ├── loader.py         # High-level loader
+│       └── utils.py          # Helper functions
+├── setup.py
+├── pyproject.toml
+└── README.md
+```
 
 ## Documentation
 
-- **[DATA_GUIDE.md](DATA_GUIDE.md)**: Complete guide to available CPAP data and clinical assessment
-- **[examples/README.md](examples/README.md)**: Example script usage
-
-## Development
-
-### Repository Cleanup
-
-To remove temporary files and clean up the repository:
-
-```bash
-# Linux/Mac
-bash cleanup.sh
-
-# Or use Python (cross-platform)
-python cleanup.py
-```
-
-This removes:
-- Old debug scripts (now in `examples/`)
-- Generated output files (`output.json`)
-- Python cache files (`__pycache__/`, `*.pyc`)
-
-### Running Tests
-```bash
-python -m pytest tests/
-```
-
-### Project Structure
-```
-cpap_analysis/
-├── cpap_parser/          # Main library package
-│   ├── edf_parser.py     # EDF/EDF+ file parser
-│   ├── identification.py # Device ID parser
-│   ├── str_parser.py     # Summary data parser
-│   ├── datalog_parser.py # Session data parser
-│   ├── settings_parser.py# Settings parser
-│   ├── loader.py         # High-level loader
-│   └── utils.py          # Helper functions
-├── examples/             # Example scripts
-├── data/                 # CPAP data files (not in git)
-├── dump_cpap_data.py     # JSON export script
-└── setup.py             # Package setup
-
-```
+- **[INSTALL.md](INSTALL.md)**: Installation instructions
+- **[USAGE.md](USAGE.md)**: Detailed usage guide and examples
+- **[DEVELOPMENT.md](DEVELOPMENT.md)**: Development setup and guidelines
+- **[CONTRIBUTING.md](CONTRIBUTING.md)**: How to contribute
 
 ## License
 
-See LICENSE file for details.
+MIT License - see [LICENSE](LICENSE) file for details.
 
 ## Contributing
 
