@@ -92,55 +92,32 @@ if date_range:
 
 ## Working with Summary Data
 
-# Get all sessions
-all_sessions = reader.get_sessions()
-
-# Get sessions for specific device
-device_sessions = reader.get_sessions(
-    device_id="1234567890"
-)
-
-# Get sessions in date range
-recent = reader.get_sessions(
-    start_date=date.today() - timedelta(days=7),
-    end_date=date.today()
-)
-
-# Get sessions with minimum duration
-long_sessions = reader.get_sessions(
-    min_duration_hours=4.0
-)
-
-# Combine filters
-filtered = reader.get_sessions(
-    device_id="1234567890",
-    start_date=date(2025, 11, 1),
-    min_duration_hours=4.0
-)
-```
-
-## Working with Sessions
-
-### Session Properties
+### Parse STR.edf Files
 
 ```python
-session = sessions[0]
+from cpap_py import STRParser
+from datetime import date
 
-# Basic info
-print(f"Date: {session.date}")
-print(f"Start: {session.start_time}")
-print(f"End: {session.end_time}")
+# Parse summary file
+parser = STRParser("/path/to/STR.edf")
+if parser.parse():
+    print(f"Loaded {len(parser.records)} daily records")
+    
+    # Access individual records
+    for record in parser.records:
+        if record.date:
+            print(f"\nDate: {record.date}")
+            print(f"  Usage: {record.mask_duration/3600:.1f} hours")
+            print(f"  AHI: {record.ahi:.1f}")
+            print(f"  Median Leak: {record.leak_50:.1f} L/min")
+            print(f"  Median Pressure: {record.mp_50:.1f} cmH2O")
+            print(f"  Therapy Mode: {record.mode}")
 
-# Duration
-print(f"Hours: {session.summary.duration_hours:.2f}")
-
-# Check data availability
-if session.has_pressure_data:
-    print("Pressure waveform available")
-if session.has_flow_data:
-    print("Flow waveform available")
-if session.has_spo2_data:
-    print("SpO2 data available")
+# Filter by date range
+start_date = date(2025, 12, 1)
+end_date = date(2025, 12, 15)
+filtered = parser.get_records_by_date_range(start_date, end_date)
+print(f"Found {len(filtered)} records in date range}")
 ```
 
 ### Session Summary Statistics
@@ -170,83 +147,106 @@ if summary.spo2_median:
     print(f"Minimum SpO2: {summary.spo2_min:.1f}%")
 ```
 
-### Respiratory Events
+## Working with Session Data
+
+### Parse DATALOG Files
 
 ```python
-# Get all events
-events = session.get_events()
-print(f"Total events: {len(events)}")
+from cpap_py import DatalogParser
 
-# Filter by event type
-from cpap_py.utils.constants import EventType
+# Initialize parser
+parser = DatalogParser("/path/to/DATALOG")
 
-obstructive = session.get_events(event_type=EventType.OBSTRUCTIVE_APNEA)
-central = session.get_events(event_type=EventType.CENTRAL_APNEA)
-hypopneas = session.get_events(event_type=EventType.HYPOPNEA)
+# Scan for available session files
+files_by_date = parser.scan_files()
+print(f"Found data for {len(files_by_date)} days")
 
-# Event details
-for event in events[:5]:  # First 5 events
-    print(f"{event.type}: {event.start_time} - {event.duration:.1f}s")
+# Parse all sessions
+sessions = parser.parse_all_sessions()
+print(f"Loaded {len(sessions)} total sessions")
+
+# Parse specific session file
+from pathlib import Path
+session_file = Path("/path/to/DATALOG/20251215/BRP00001.edf")
+session = parser.parse_session_file(session_file)
 ```
 
-## Accessing Waveform Data
-
-### Pressure Data
+### Access Waveform Data
 
 ```python
-# Get pressure waveform (returns pandas DataFrame)
-pressure_df = session.get_pressure_data()
+# Access detailed waveform data
+session = sessions[0]
 
-print(f"Data points: {len(pressure_df)}")
-print(f"Time range: {pressure_df['time'].min()} to {pressure_df['time'].max()}")
-print(f"Pressure range: {pressure_df['pressure'].min():.1f} - {pressure_df['pressure'].max():.1f} cmH2O")
+print(f"Session: {session.start_time}")
+print(f"Duration: {session.duration/3600:.2f} hours")
+print(f"Sample rate: {session.sample_rate} Hz")
 
-# Access values
-times = pressure_df['time']
-pressures = pressure_df['pressure']
+# Flow rate (L/min)
+if session.flow_rate:
+    print(f"Flow rate samples: {len(session.flow_rate)}")
+    print(f"  Min: {min(session.flow_rate):.1f}")
+    print(f"  Max: {max(session.flow_rate):.1f}")
 
-# Calculate statistics
-mean_pressure = pressure_df['pressure'].mean()
-std_pressure = pressure_df['pressure'].std()
-```
-
-### Flow Data
-
-```python
-# Get flow waveform
-flow_df = session.get_flow_data()
-
-# Flow is in L/min
-print(f"Flow range: {flow_df['flow'].min():.1f} - {flow_df['flow'].max():.1f} L/min")
-
-# Identify inhalation vs exhalation
-inhalation = flow_df[flow_df['flow'] > 0]
-exhalation = flow_df[flow_df['flow'] < 0]
-```
-
-### SpO2 Data
-
-```python
-# Get SpO2 data (if available)
-if session.has_spo2_data:
-    spo2_df = session.get_spo2_data()
+# Pressure (cmH2O)
+if session.pressure:
+    print(f"Pressure samples: {len(session.pressure)}")
     
-    print(f"SpO2 range: {spo2_df['spo2'].min():.1f}% - {spo2_df['spo2'].max():.1f}%")
-    
-    # Also includes pulse rate
-    if 'pulse' in spo2_df.columns:
-        print(f"Pulse range: {spo2_df['pulse'].min():.0f} - {spo2_df['pulse'].max():.0f} BPM")
-    
-    # Identify desaturations (SpO2 < 90%)
-    desats = spo2_df[spo2_df['spo2'] < 90]
-    print(f"Time with SpO2 < 90%: {len(desats)} data points")
+# Leak (L/min)
+if session.leak:
+    print(f"Leak samples: {len(session.leak)}")
+
+# Respiratory metrics
+if session.tidal_volume:
+    print(f"Tidal volume samples: {len(session.tidal_volume)}")
+if session.minute_vent:
+    print(f"Minute ventilation samples: {len(session.minute_vent)}")
+if session.resp_rate:
+    print(f"Respiratory rate samples: {len(session.resp_rate)}")
 ```
 
-### Flow Limitation and Snore
+### Access Events
 
 ```python
-# Flow limitation (0.0-1.0, higher = more limited)
-fl_df = session.get_flow_limitation_data()
+# Parse events from session
+for event in session.events:
+    print(f"Event: {event.event_type}")
+    print(f"  Time: {event.timestamp:.1f}s")
+    print(f"  Duration: {event.duration:.1f}s")
+```
+
+### Filter Sessions by Date
+
+```python
+from datetime import date
+
+# Get sessions for specific date
+target_date = date(2025, 12, 15)
+day_sessions = parser.get_sessions_by_date(target_date)
+
+# Get sessions in date range
+start = date(2025, 12, 1)
+end = date(2025, 12, 15)
+range_sessions = parser.get_sessions_by_date_range(start, end)
+```
+
+## Device Settings
+
+### Parse Settings Files
+
+```python
+from cpap_py import SettingsParser
+
+# Initialize parser
+parser = SettingsParser("/path/to/SETTINGS")
+
+# Parse all settings files
+changes = parser.parse_all()
+print(f"Found {len(changes)} setting changes")
+
+# View changes
+for change in changes:
+    print(f"{change.timestamp}: {change.setting}")
+    print(f"  Value: {change.value}")
 ## Device Settings
 
 ### Parse Settings Files
@@ -734,36 +734,23 @@ def get_cpap_data(path: str):
 
 ## API Reference
 
-See the main [README.md](README.md#api-reference) for complete API documentation.
+See the main [README.md](README.md#api-reference) for complete API documentation, including:
 
-### Key Classes
-
-- **CPAPReader**: Main entry point for reading data
-- **Device**: CPAP device information
-- **Session**: Therapy session with data and events
-- **SessionSummary**: Summary statistics for a session
-- **DeviceSettings**: Device configuration
-- **SettingsProposal**: Proposed settings changes
-- **Event**: Respiratory event (apnea, hypopnea, etc.)
-- **WaveformData**: Time-series signal data
-
-### Common Workflows
-
-1. **Load and explore**: `CPAPReader` → `get_devices()` → `get_sessions()`
-2. **Analyze session**: `session.summary` → `session.get_events()`
-3. **Get waveforms**: `get_pressure_data()`, `get_flow_data()`, `get_spo2_data()`
-4. **Review settings**: `session.settings`
-5. **Propose changes**: `create_pressure_adjustment_proposal()`
+- CPAPLoader methods
+- IdentificationParser
+- STRParser and STRRecord fields
+- DatalogParser and SessionData fields  
+- SettingsParser and SettingChange fields
+- EDFParser for low-level EDF access
+- Utility functions
 
 ## Best Practices
 
-1. **Use lazy loading**: Default behavior loads waveforms only when needed
-2. **Filter sessions**: Use date ranges and filters to reduce memory usage
-3. **Check data availability**: Use `has_pressure_data` etc. before requesting
-4. **Handle missing data**: Not all sessions have all signal types
-5. **Validate proposals**: Always check `all_changes_safe` before applying
-6. **Export for analysis**: Use pandas DataFrames for statistical analysis
-7. **CRC validation**: Use PERMISSIVE mode unless data integrity is critical
+1. **Use CPAPLoader for simplicity**: The high-level interface handles all the complexity
+2. **Check for None**: Not all fields are present in all files
+3. **Handle missing data**: Some signals may not be present in all sessions
+4. **Respect data privacy**: CPAP data contains health information
+5. **Validate data**: Always check return values before using data
 
 ## Additional Resources
 
@@ -772,4 +759,5 @@ For more information:
 - **Development**: See [DEVELOPMENT.md](DEVELOPMENT.md)
 - **Contributing**: See [CONTRIBUTING.md](CONTRIBUTING.md)
 - **API Reference**: See [README.md](README.md#api-reference)
-- **Test Documentation**: See [tests/README.md](tests/README.md)
+- **Test Documentation**: See [TEST_SUITE.md](TEST_SUITE.md)
+

@@ -15,7 +15,7 @@ This guide covers the development workflow, testing, and contributing to cpap-py
 
 ### Prerequisites
 
-- Python 3.8+
+- Python 3.9+
 - Git
 - pip
 - Virtual environment tool (venv, virtualenv, or conda)
@@ -51,6 +51,9 @@ pip install -e ".[dev]"
 4. **Verify Installation**
 
 ```bash
+# Run tests
+./run_tests.sh
+
 # Check imports
 python -c "from cpap_py import CPAPLoader; print('Success!')"
 ```
@@ -104,7 +107,15 @@ cpap-py/
 │       ├── settings_parser.py# Settings file parser
 │       ├── loader.py         # High-level unified loader
 │       └── utils.py          # Utility functions
-├── tests/                    # Test suite (to be created)
+├── tests/                    # Comprehensive test suite (97% coverage, 188 tests)
+│   ├── conftest.py           # Pytest fixtures
+│   ├── test_init.py          # Package initialization tests
+│   ├── test_identification.py # ID parser tests
+│   ├── test_edf_parser.py    # EDF parser tests
+│   ├── test_utils.py         # Utility tests
+│   ├── test_parser_core.py   # Core parser tests
+│   ├── test_integration.py   # Integration tests
+│   └── ...                   # Additional test files
 ├── setup.py                  # Package setup configuration
 ├── pyproject.toml            # Modern Python project configuration
 ├── requirements.txt          # Runtime dependencies (none!)
@@ -129,41 +140,63 @@ cpap-py/
 
 ## Testing
 
-Tests will be created as the project develops. For now, manual testing can be done with sample CPAP data.
+The library includes a comprehensive test suite with **97% code coverage** and **188 automated tests**.
 
-### Running Tests (Future)
+### Running Tests
 
 ```bash
-# Run all tests
-pytest
+# Run all tests with coverage
+./run_tests.sh
 
 # Run with verbose output
-pytest -v
+pytest tests/ -v
 
 # Run specific test file
-pytest tests/test_edf_parser.py
+pytest tests/test_edf_parser.py -v
 
-# Run with coverage
-pytest --cov=cpap_py --cov-report=html
+# Run with coverage report
+pytest tests/ --cov=cpap_py --cov-report=term-missing
+
+# Run specific test
+pytest tests/test_identification.py::TestIdentificationParser::test_parse_tgt_file -v
 ```
+
+### Test Organization
+
+Test files are organized by module:
+
+- `test_init.py` - Package initialization tests
+- `test_identification.py` - Device ID parser tests  
+- `test_edf_parser.py` - EDF format parser tests
+- `test_utils.py` - Utility function tests
+- `test_parser_core.py` - Core parser functionality
+- `test_integration.py` - Integration tests
+- `test_mock_scenarios.py` - Mock-based tests
+- `test_realistic_edf_data.py` - Realistic data tests
+- `test_signal_combinations.py` - Signal combination tests
+- `test_bilevel_modes.py` - BiLevel therapy mode tests
+- `test_settings_alternative_signals.py` - Alternative signal tests
+- `test_optional_signals_errors.py` - Error handling tests
+
+See [TEST_SUITE.md](TEST_SUITE.md) for detailed test documentation.
 
 ### Writing Tests
 
-Tests should be placed in the `tests/` directory with filenames matching `test_*.py`.
+Tests use pytest and should include:
 
 ```python
-# tests/test_example.py
 import pytest
 from cpap_py import EDFParser
 
-def test_edf_parser_init():
+def test_edf_parser_basic():
+    """Test basic EDF parser functionality"""
     parser = EDFParser("test.edf")
-    assert parser.filepath.name == "test.edf"
+    assert parser is not None
 
-def test_parse_header():
-    parser = EDFParser("tests/data/test.edf")
-    assert parser.parse_header() == True
-    assert parser.header.num_signals > 0
+def test_parse_with_fixture(sample_edf_file):
+    """Test using fixture from conftest.py"""
+    parser = EDFParser(str(sample_edf_file))
+    assert parser.parse() == True
 ```
 
 ## Code Style
