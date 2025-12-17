@@ -1,11 +1,9 @@
 include README.md
-include LICENSE
-include INSTALL.md
-include USAGE.md
+include DATA_GUIDE.md
 include CONTRIBUTING.md
-include DEVELOPMENT.md
-include requirements.txt
-include pytest.ini
-include run_tests.sh
+include LICENSE
 recursive-include src/cpap_py *.py
-recursive-include data *.edf *.crc *.tgt
+recursive-include examples *.py *.md
+
+global-exclude __pycache__
+global-exclude *.py[co]

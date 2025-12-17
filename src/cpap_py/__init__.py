@@ -1,27 +1,36 @@
 """
-cpap-py: A comprehensive Python library for parsing and analyzing ResMed CPAP machine data.
+CPAP Data Parser Library
+
+A Python library for parsing ResMed CPAP data files including:
+- Identification files (.tgt, .json)
+- STR.edf files (summary data)
+- DATALOG EDF files (BRP, PLD, SAD, EVE, CSL, AEV)
+- Settings files
+
+Based on the OSCAR CPAP analysis software.
 """
 
+from .identification import IdentificationParser, MachineInfo
+from .edf_parser import EDFParser, EDFSignal, EDFHeader
+from .str_parser import STRParser, STRRecord
+from .datalog_parser import DatalogParser, SessionData, SessionEvent
+from .settings_parser import SettingsParser, SettingChange
+from .loader import CPAPLoader, CPAPData
+
 __version__ = "0.1.0"
-
-from cpap_py.reader import CPAPReader
-from cpap_py.models import (
-    Device,
-    Session,
-    SessionSummary,
-    Event,
-    WaveformData,
-    DeviceSettings,
-)
-from cpap_py.settings import SettingsProposal
-
 __all__ = [
-    "CPAPReader",
-    "Device",
-    "Session",
-    "SessionSummary",
-    "Event",
-    "WaveformData",
-    "DeviceSettings",
-    "SettingsProposal",
+    "IdentificationParser",
+    "MachineInfo", 
+    "EDFParser",
+    "EDFSignal",
+    "EDFHeader",
+    "STRParser",
+    "STRRecord",
+    "DatalogParser",
+    "SessionData",
+    "SessionEvent",
+    "SettingsParser",
+    "SettingChange",
+    "CPAPLoader",
+    "CPAPData",
 ]

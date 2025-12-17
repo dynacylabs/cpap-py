@@ -1,355 +1,306 @@
-# cpap-py
+# CPAP Data Parser Library
 
-A comprehensive Python library for parsing and analyzing ResMed CPAP (AirSense 10/11) machine data from SD card exports.
+A Python library for parsing ResMed CPAP (Continuous Positive Airway Pressure) device data files. This library supports parsing all information stored in CPAP data files including device identification, summary statistics, detailed waveform data, and configuration changes.
 
 ## Features
 
-- 📊 Parse all ResMed EDF file types (BRP, PLD, SAD, EVE, CSL, STR)
-- ⚙️ Read and parse device settings (TGT files)
-- ✅ CRC verification with configurable validation modes
-- 🔍 Session discovery and grouping by device
-- 📈 Time-series data access (pressure, flow, SpO2, flow limitation, snore)
-- 🏥 Clinical metrics and therapy statistics
-- 🤖 MCP (Model Context Protocol) ready
-- 🐍 Type-safe with Pydantic models
-- 📦 Zero GUI dependencies - pure Python library
+- **Complete Data Extraction**: Parses all available CPAP data including pressure settings, delivered pressures, leak rates, respiratory metrics, and event indices
+- **Device Identification**: Parse both `.tgt` (text) and `.json` format identification files
+- **Summary Data**: Extract daily statistics from `STR.edf` files including AHI, leak, pressure, respiratory rate
+- **Session Data**: Parse detailed waveform data from `DATALOG` EDF files
+- **Settings & Configuration**: Extract device settings including pressure ranges (min/max), comfort settings, humidification
+- **EDF/EDF+ Support**: Full parser for European Data Format files used by medical devices
+- **Multiple Device Support**: Works with ResMed S9, AirSense 10, AirSense 11, and AirCurve series
+- **JSON Export**: Complete data export to JSON for analysis
 
 ## Installation
 
 ```bash
-pip install cpap-py
-```
-
-For development:
-```bash
-git clone <repository>
-cd cpap-py
-pip install -e ".[dev]"
+pip install -e .
 ```
 
 ## Quick Start
 
+### Generate Complete JSON Output
+
+```bash
+# Export all CPAP data to JSON
+python dump_cpap_data.py data/set_1/ > output.json
+```
+
+The output.json file contains:
+- Device identification and firmware info
+- Current device configuration (pressure ranges, comfort settings, humidification)
+- Daily summary records with AHI, leak stats, pressure stats, respiratory metrics
+- Detailed session data organized by date
+- Settings change history
+
+See [DATA_GUIDE.md](DATA_GUIDE.md) for complete details on the JSON output format.
+
+### Use the Library Programmatically
+
 ```python
-from cpap_py import CPAPReader
+from cpap_parser import CPAPLoader
 
-# Load data from SD card directory
-reader = CPAPReader("/path/to/sdcard")
+# Load all data from a CPAP data directory
+loader = CPAPLoader("path/to/cpap/data")
+data = loader.load_all()
 
-# Get all devices found on card
-devices = reader.get_devices()
+# Access device information
+print(f"Device: {data.machine_info.model}")
+print(f"Serial: {data.machine_info.serial}")
 
-# Get sessions for a specific device
-sessions = reader.get_sessions(device_id=devices[0].serial_number)
+# Access daily summary records
+for record in data.summary_records:
+    print(f"Date: {record.date}")
+    print(f"  AHI: {record.ahi:.1f}")
+    print(f"  Duration: {record.mask_duration/3600:.1f} hours")
+    print(f"  Leak (median): {record.leak_50:.1f} L/min")
 
-# Access session details
+# Access detailed session data
+for session in data.sessions:
+    print(f"Session: {session.start_time}")
+    print(f"  Flow rate samples: {len(session.flow_rate)}")
+    print(f"  Pressure samples: {len(session.pressure)}")
+    print(f"  Events: {len(session.events)}")
+```
+
+## Usage Examples
+
+### Load Only Identification
+
+```python
+from cpap_parser import IdentificationParser
+
+parser = IdentificationParser("path/to/data")
+info = parser.parse()
+print(f"{info.model} (S/N: {info.serial})")
+```
+
+### Load Summary Data
+
+```python
+from cpap_parser import STRParser
+
+parser = STRParser("path/to/STR.edf")
+if parser.parse():
+    for record in parser.records:
+        if record.date:
+            print(f"{record.date}: AHI={record.ahi:.1f}, Hours={record.mask_duration/3600:.1f}")
+```
+
+### Load Session Data
+
+```python
+from cpap_parser import DatalogParser
+
+parser = DatalogParser("path/to/DATALOG")
+sessions = parser.parse_all_sessions()
+
 for session in sessions:
-    print(f"Session on {session.date}")
-    print(f"Duration: {session.duration_hours:.2f} hours")
-    print(f"AHI: {session.summary.ahi:.1f}")
-    
-    # Get waveform data
-    pressure = session.get_pressure_data()  # Returns pandas DataFrame
-    flow = session.get_flow_data()
-    spo2 = session.get_spo2_data()
-    
-    # Get events
-    events = session.get_events()  # Returns list of Event objects
+    print(f"{session.date} - {session.file_type}")
+    print(f"  Sample rate: {session.sample_rate} Hz")
+    print(f"  Duration: {session.duration/3600:.2f} hours")
 ```
 
-## Architecture
+### Parse Individual EDF Files
+
+```python
+from cpap_parser import EDFParser
+
+edf = EDFParser("path/to/file.edf")
+if edf.parse():
+    print(f"Signals: {len(edf.signals)}")
+    for signal in edf.signals:
+        print(f"  {signal.label}: {len(signal.data)} samples")
+        # Get physical (scaled) values
+        values = edf.get_physical_values(signal)
+```
+
+## Data Directory Structure
+
+The library expects data in the ResMed CPAP format:
 
 ```
-cpap-py/
-├── src/cpap_py/
-│   ├── __init__.py
-│   ├── reader.py           # Main CPAPReader API
-│   ├── models.py           # Pydantic data models
-│   ├── settings.py         # Settings models and proposals
-│   ├── parsers/
-│   │   ├── edf_parser.py   # EDF file parser
-│   │   ├── str_parser.py   # Custom STR.edf parser
-│   │   ├── tgt_parser.py   # Settings file parser
-│   │   └── crc_parser.py   # CRC verification
-│   └── utils/
-│       ├── constants.py    # Channel IDs, event types
-│       └── validation.py   # Data validation utilities
-├── tests/                  # Comprehensive test suite
-│   └── README.md           # Test documentation
-├── docs/                   # Additional documentation
-└── data/                   # Sample CPAP data
+data_directory/
+├── Identification.tgt     # or Identification.json
+├── STR.edf               # Daily summary data
+├── DATALOG/
+│   ├── 20251126/        # Date folders (YYYYMMDD)
+│   │   ├── BRP00001.edf # Breathing data
+│   │   ├── PLD00001.edf # Pressure/leak data
+│   │   └── EVE00001.edf # Events
+│   └── 20251127/
+└── SETTINGS/
+    ├── CGL.tgt          # Clinical settings
+    └── UGL.tgt          # User settings
 ```
 
 ## File Types
 
-ResMed SD cards contain several file types:
+### Identification Files
+- `.tgt`: Text format with `#KEY value` pairs
+- `.json`: JSON format (AirSense 11)
 
-- **BRP**: Breathing/Respiratory/Pressure waveform data
-- **PLD**: Detailed pressure measurements (high resolution)
-- **SAD**: SpO2/oximetry data (blood oxygen saturation)
-- **EVE**: Events (apneas, hypopneas, flow limitations)
-- **CSL**: Clinical session summaries with Cheyne-Stokes events
-- **STR.edf**: Summary statistics with mask on/off times
-- **TGT**: Device settings (plain text key-value format)
-- **CRC**: Checksums for data integrity verification
+### EDF Files
+- `STR.edf`: Daily summary statistics
+- `BRP.edf`: Breathing waveforms (flow, tidal volume, etc.)
+- `PLD.edf`: Pressure and leak data
+- `SAD.edf`: Summary/advanced data
+- `EVE.edf`: Event markers (apneas, hypopneas)
+- `CSL.edf`: Clinical settings log
+- `AEV.edf`: Advanced events
 
 ## API Reference
 
-### CPAPReader
-
-Main entry point for reading SD card data.
-
-```python
-CPAPReader(
-    sdcard_path: str,
-    crc_validation: CRCValidationMode = CRCValidationMode.PERMISSIVE,
-    lazy_load: bool = True
-)
-```
-
-**Key Methods:**
-- `get_devices() -> List[Device]` - Get all devices found on card
-- `get_sessions(...) -> List[Session]` - Get therapy sessions with optional filters
-- `get_summary_statistics(days=30) -> Dict` - Get aggregate statistics
-- `export_to_dict() -> Dict` - Export all data as JSON-serializable dict
-
-### Session
-
-Represents a therapy session.
-
-**Properties:**
-- `date: date` - Session date
-- `start_time: datetime` - Session start time
-- `end_time: datetime` - Session end time
-- `summary: SessionSummary` - Summary statistics (AHI, pressure, leak, SpO2)
-- `settings: DeviceSettings` - Device configuration
-- `has_pressure_data: bool` - Pressure waveform available
-- `has_flow_data: bool` - Flow waveform available
-- `has_spo2_data: bool` - SpO2 data available
+### CPAPLoader
+Main high-level interface for loading CPAP data.
 
 **Methods:**
-- `get_events(event_type=None) -> List[Event]` - Get respiratory events
-- `get_pressure_data() -> pd.DataFrame` - Get pressure waveform
-- `get_flow_data() -> pd.DataFrame` - Get flow waveform
-- `get_spo2_data() -> pd.DataFrame` - Get SpO2 waveform
-- `get_flow_limitation_data() -> pd.DataFrame` - Get flow limitation signal
-- `get_snore_data() -> pd.DataFrame` - Get snore detection signal
+- `load_all()`: Load all data (identification, summary, sessions, settings)
+- `load_identification_only()`: Load only device info
+- `load_summary_only()`: Load only STR.edf
+- `load_sessions_for_date(date)`: Load sessions for specific date
+- `get_date_range()`: Get (start_date, end_date) of available data
 
-### SessionSummary
+### IdentificationParser
+Parse device identification files.
 
-Summary statistics for a therapy session.
+**Methods:**
+- `parse()`: Parse and return MachineInfo object
 
-**Key Properties:**
-- `duration_hours: float` - Session duration
-- `ahi: float` - Apnea-Hypopnea Index
-- `ai: float` - Apnea Index
-- `hi: float` - Hypopnea Index
-- `obstructive_apneas: int` - Count of obstructive apneas
-- `central_apneas: int` - Count of central apneas
-- `hypopneas: int` - Count of hypopneas
-- `pressure_median: float` - Median pressure (cmH2O)
-- `pressure_95th: float` - 95th percentile pressure
-- `leak_median: float` - Median leak rate (L/min)
-- `leak_95th: float` - 95th percentile leak
-- `spo2_median: float` - Median SpO2 (%)
-- `spo2_min: float` - Minimum SpO2
+### STRParser
+Parse STR.edf summary files.
 
-### Settings Proposals
+**Methods:**
+- `parse()`: Parse file and populate records list
+- `get_records_by_date_range(start, end)`: Filter records by date
 
-Enables AI to propose changes without writing files:
+### DatalogParser
+Parse DATALOG session files.
 
-```python
-from cpap_py.settings import create_pressure_adjustment_proposal
+**Methods:**
+- `scan_files()`: Scan DATALOG directory and return files by date
+- `parse_session_file(path)`: Parse single session file
+- `parse_all_sessions()`: Parse all sessions
+- `get_sessions_by_date(date)`: Get sessions for specific date
+- `get_sessions_by_date_range(start, end)`: Get sessions in date range
 
-proposal = create_pressure_adjustment_proposal(
-    device_serial="ABC123",
-    current_settings=session.settings,
-    target_pressure=14.0,
-    reason="Elevated AHI",
-    ahi=8.5
-)
+### EDFParser
+Low-level EDF/EDF+ file parser.
 
-print(proposal.to_summary())
-if proposal.all_changes_safe:
-    new_settings = proposal.apply_to_settings(session.settings)
+**Methods:**
+- `parse()`: Parse entire file
+- `parse_header()`: Parse only header
+- `parse_signal_headers()`: Parse signal definitions
+- `parse_data()`: Parse signal data
+- `get_signal(label, index=0)`: Find signal by label
+- `get_physical_values(signal)`: Convert digital to physical values
+
+## Data Classes
+
+### MachineInfo
+Device identification information.
+
+**Fields:** `serial`, `model`, `model_number`, `series`, `properties`
+
+### STRRecord
+Daily summary record.
+
+**Fields:** `date`, `ahi`, `leak_50`, `leak_95`, `mask_duration`, `mode`, `min_pressure`, `max_pressure`, and many more...
+
+### SessionData
+Detailed session data.
+
+**Fields:** `date`, `start_time`, `duration`, `flow_rate`, `pressure`, `leak`, `events`, and more waveform data...
+
+### EDFSignal
+EDF signal descriptor.
+
+**Fields:** `label`, `physical_dimension`, `sample_count`, `gain`, `offset`, `data`
+
+## Example Scripts
+
+See the [examples/](examples/) directory for useful scripts:
+
+- **show_one_day.py**: Display all data for a specific date
+- **list_str_signals.py**: List all available signals in STR.edf
+- **show_settings.py**: View device settings from .tgt files
+
+## Documentation
+
+- **[DATA_GUIDE.md](DATA_GUIDE.md)**: Complete guide to available CPAP data and clinical assessment
+- **[examples/README.md](examples/README.md)**: Example script usage
+
+## Development
+
+### Repository Cleanup
+
+To remove temporary files and clean up the repository:
+
+```bash
+# Linux/Mac
+bash cleanup.sh
+
+# Or use Python (cross-platform)
+python cleanup.py
 ```
 
-## Common Workflows
+This removes:
+- Old debug scripts (now in `examples/`)
+- Generated output files (`output.json`)
+- Python cache files (`__pycache__/`, `*.pyc`)
 
-### Analyze Last 7 Days
-```python
-from datetime import date, timedelta
-
-recent = reader.get_sessions(
-    start_date=date.today() - timedelta(days=7)
-)
-
-total_ahi = sum(s.summary.ahi for s in recent if s.summary.ahi)
-avg_ahi = total_ahi / len(recent)
+### Running Tests
+```bash
+python -m pytest tests/
 ```
 
-### Find Problem Sessions
-```python
-high_ahi = [s for s in sessions if s.summary.ahi > 10]
-high_leak = [s for s in sessions if s.summary.leak_95th > 24]
+### Project Structure
+```
+cpap_analysis/
+├── cpap_parser/          # Main library package
+│   ├── edf_parser.py     # EDF/EDF+ file parser
+│   ├── identification.py # Device ID parser
+│   ├── str_parser.py     # Summary data parser
+│   ├── datalog_parser.py # Session data parser
+│   ├── settings_parser.py# Settings parser
+│   ├── loader.py         # High-level loader
+│   └── utils.py          # Helper functions
+├── examples/             # Example scripts
+├── data/                 # CPAP data files (not in git)
+├── dump_cpap_data.py     # JSON export script
+└── setup.py             # Package setup
+
 ```
 
-### Export for Analysis
-```python
-import pandas as pd
+## License
 
-data = []
-for s in sessions:
-    data.append({
-        'date': s.date,
-        'ahi': s.summary.ahi,
-        'hours': s.summary.duration_hours,
-        'leak': s.summary.leak_95th,
-    })
+See LICENSE file for details.
 
-df = pd.DataFrame(data)
-df.to_csv('therapy_summary.csv')
-```
+## Contributing
 
-## Signal Extraction
+Contributions welcome! Please open an issue or pull request.
 
-The library extracts all critical clinical signals:
+## Acknowledgments
 
-### Core Signals
-- **Mask Pressure** (40ms or 2s resolution)
-- **Flow Rate** (40ms or 2s resolution)
-- **Leak Rate**
-- **Respiratory Rate**
-- **Tidal Volume**
+Based on the excellent [OSCAR](https://gitlab.com/CrimsonNape/OSCAR-code) CPAP analysis software.
 
-### Advanced Signals
-- **Flow Limitation** (0.0-1.0 index, 0.5 Hz) - Indicates upper airway restriction
-- **Snore Detection** (0.0-1.0 index, 0.5 Hz) - Vibratory snore indication
-- **EPAP** (BiLevel machines) - Expiratory pressure
-- **Target Ventilation** (ASV/iVAPS) - Target minute ventilation
+## Utilities
 
-### Oximetry (if available)
-- **SpO2** - Blood oxygen saturation (%)
-- **Pulse Rate** - Heart rate (BPM)
+The `utils` module provides helper functions:
 
-### Event Types
-- `OA` - Obstructive Apnea
-- `CA` - Central Apnea
-- `H` - Hypopnea
-- `FL` - Flow Limitation
-- `RE` - RERA
-- `VS` - Vibratory Snore
-- `LL` - Large Leak
-- `CSR` - Cheyne-Stokes Respiration
+- `split_sessions_by_noon(timestamps)`: Split timestamps by noon boundary
+- `format_duration(seconds)`: Format duration as HH:MM:SS
+- `calculate_ahi(apneas, hypopneas, hours)`: Calculate AHI
+- `therapy_mode_name(mode)`: Get mode name string
+- `downsample_signal(data, factor)`: Downsample signal data
+- `calculate_percentile(data, percentile)`: Calculate percentile
 
-## STR.edf Parser
+## Based On
 
-The library includes a custom parser for ResMed's non-standard STR.edf files:
-
-- Handles empty/invalid physical dimension fields
-- Extracts device serial number
-- Reads all 81 signal channels
-- Parses mask on/off times (session boundaries)
-- Captures daily summary statistics
-- Matches DATALOG sessions to STR session times
-- Populates SessionSummary with accurate statistics
-- Supports multi-session days
-
-## MCP Integration
-
-All data structures are JSON-serializable for Model Context Protocol:
-
-```python
-# Export data for MCP server
-data = reader.export_to_dict()
-
-# All Pydantic models have to_dict() methods
-session_dict = session.to_dict()
-proposal_dict = proposal.to_dict()
-
-import json
-json_output = json.dumps(data, default=str)
-```
-
-See USAGE.md for more detailed examples and integration patterns.
-
-## Performance Considerations
-
-- **Lazy Loading**: Waveform data is only loaded when requested
-- **Filtering**: Use filters in `get_sessions()` to reduce memory usage
-- **CRC Validation**: Disable if performance is critical and data integrity is assured
-
-## Safety Features
-
-1. **Validation**: Settings proposals checked against clinical limits
-2. **Approval Flags**: Major changes flagged for clinical review
-3. **Read-Only**: Never writes to SD card
-4. **Error Tracking**: All parsing errors collected and reported
-5. **CRC Verification**: Optional data integrity checking
-
-## Dependencies
-
-### Core
-- `pyedflib>=0.1.30` - EDF file parsing
-- `numpy>=1.20.0` - Array operations
-- `pandas>=1.3.0` - DataFrame support
-- `pydantic>=2.0.0` - Data validation & serialization
-- `python-dateutil>=2.8.0` - Date handling
-
-### Development
-- `pytest>=7.0.0` - Testing
-- `black>=23.0.0` - Code formatting
-- `ruff>=0.1.0` - Linting
-- `mypy>=1.0.0` - Type checking
-
-## Changelog
-
-### [Unreleased] - 2025-12-01
-
-**Added:**
-- STR session matching algorithm connecting DATALOG files with STR.edf boundaries
-- Summary statistics integration with real STR.edf data
-- Multi-session day support with proper session indexing
-- Flow limitation and snore signal extraction
-- High-resolution signal prioritization
-- Cheyne-Stokes Respiration (CSR) event extraction
-- EPAP and target ventilation signal support
-
-**Enhanced:**
-- Comprehensive signal name standardization (40+ mappings)
-- Unit conversion (L/s → L/min for flow and leak)
-- CSL file parsing for clinical events
-
-### [0.1.0] - 2025-11-27 (Initial Implementation)
-
-**Added:**
-- Complete Python library for parsing ResMed CPAP data
-- EDF file parsers (BRP, PLD, SAD, EVE, CSL)
-- Custom STR.edf parser handling non-compliant format
-- TGT settings file parser
-- CRC validation with configurable modes
-- Pydantic data models for type safety
-- Settings proposal system with safety validation
-- MCP-ready JSON serialization
+This library is based on the file format specifications from [OSCAR](https://www.sleepfiles.com/OSCAR/) (Open Source CPAP Analysis Reporter), an open-source CPAP data analysis application.
 
 ## License
 
 MIT License - see LICENSE file for details
-
-## Contributing
-
-Contributions welcome! Please ensure:
-- Code follows black formatting
-- Type hints are included
-- Tests pass
-- Documentation is updated
-
-## Acknowledgments
-
-Based on research from:
-- [OSCAR project](https://www.sleepfiles.com/OSCAR/) - Open-source CPAP analysis
-- ResMed file format documentation
-- EDF+ standard specifications
-
-## Support
-
-For issues, questions, or contributions, please use the GitHub issue tracker.
