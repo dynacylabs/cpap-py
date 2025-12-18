@@ -11,7 +11,9 @@ class TestPackageImports:
     def test_version_exists(self):
         """Test that __version__ is defined"""
         from cpap_py import __version__
-        assert __version__ == "0.1.0"
+        assert __version__ is not None
+        assert isinstance(__version__, str)
+        assert len(__version__) > 0
     
     def test_all_exports(self):
         """Test that __all__ contains expected exports"""

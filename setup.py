@@ -14,7 +14,6 @@ else:
 
 setup(
     name="cpap-py",
-    version="0.1.0",
     author="DynacyLabs",
     description="A comprehensive Python library for parsing and analyzing ResMed CPAP machine data",
     long_description=long_description,
