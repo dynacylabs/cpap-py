@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=65.0", "wheel"]
+requires = ["setuptools>=65.0", "wheel", "setuptools-scm>=8.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "cpap-py"
-version = "0.1.0"
+dynamic = ["version"]
 description = "A comprehensive Python library for parsing and analyzing ResMed CPAP machine data"
 authors = [
     {name = "DynacyLabs"}
@@ -93,3 +93,6 @@ omit = [
     "*/tests/*",
     "*/__pycache__/*",
 ]
+
+[tool.setuptools_scm]
+write_to = "src/cpap_py/_version.py"
